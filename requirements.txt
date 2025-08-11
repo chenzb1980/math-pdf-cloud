@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pymupdf
+pytesseract
+pillow
+pandas
+openpyxl
+pdfplumber
+aiofiles
