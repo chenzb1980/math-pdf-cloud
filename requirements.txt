@@ -8,3 +8,5 @@ pandas
 openpyxl
 pdfplumber
 aiofiles
+gunicorn
+flask
