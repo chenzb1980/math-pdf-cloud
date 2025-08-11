@@ -134,7 +134,9 @@ def download_result(task_id: str):
     if t.get("status") != "done" or not t.get("file"):
         return JSONResponse({"error":"not ready"}, status_code=400)
     return FileResponse(t['file'], filename=os.path.basename(t['file']), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    
+@app.route("/")
+def home():
+    return "Math PDF Cloud API is running!"
 
 from flask import Flask
 app = Flask(__name__)
