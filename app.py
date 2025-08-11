@@ -91,6 +91,7 @@ def extract_single_pdf_to_df(pdf_path, task_id=None):
         if task_id:
             pct = int((pno+1)/total*100)
             update_progress(task_id, percent=pct, message=f"processed page {pno+1}/{total}")
+    doc.close()  # Close the document to free resources
     df = pd.DataFrame(rows)
     return df
 
@@ -110,12 +111,25 @@ def process_task(task_id, saved_path):
 
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
+    # Validate file type
+    if not file.filename.lower().endswith('.pdf'):
+        return JSONResponse({"error": "Only PDF files are allowed"}, status_code=400)
+    
     fname = f"{uuid.uuid4().hex}_{file.filename}"
     save_path = os.path.join(UPLOAD_DIR, fname)
+    
+    # Read file content properly for async upload
+    content = await file.read()
     with open(save_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+        f.write(content)
+    
     task_id = uuid.uuid4().hex
-    tasks[task_id] = {"status":"queued","percent":0,"log":[f"uploaded {file.filename}"], "file": None}
+    tasks[task_id] = {
+        "status": "queued",
+        "percent": 0,
+        "log": [f"uploaded {file.filename}"],
+        "file": None
+    }
     executor.submit(process_task, task_id, save_path)
     return {"task_id": task_id}
 
@@ -123,20 +137,29 @@ async def upload_pdf(file: UploadFile = File(...)):
 def get_progress(task_id: str):
     t = tasks.get(task_id)
     if not t:
-        return JSONResponse({"error":"task not found"}, status_code=404)
+        return JSONResponse({"error": "task not found"}, status_code=404)
     return t
 
 @app.get("/download/{task_id}")
 def download_result(task_id: str):
     t = tasks.get(task_id)
     if not t:
-        return JSONResponse({"error":"task not found"}, status_code=404)
+        return JSONResponse({"error": "task not found"}, status_code=404)
     if t.get("status") != "done" or not t.get("file"):
-        return JSONResponse({"error":"not ready"}, status_code=400)
-    return FileResponse(t['file'], filename=os.path.basename(t['file']), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-@app.route("/")
-def home():
-    return "Math PDF Cloud API is running!"
+        return JSONResponse({"error": "not ready"}, status_code=400)
+    return FileResponse(
+        t['file'], 
+        filename=os.path.basename(t['file']), 
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
-from flask import Flask
-app = Flask(__name__)
+@app.get("/")  # Changed from @app.route("/") which is Flask syntax
+def home():
+    return {"message": "Math PDF Cloud API is running!"}
+
+# Removed the Flask import and app creation at the end - this should be FastAPI only
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+    
